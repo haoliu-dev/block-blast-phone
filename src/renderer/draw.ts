@@ -61,7 +61,7 @@ export function drawShapes(ctx: CanvasRenderingContext2D, shapes: { cells: [numb
   const startY = config.height - config.cellSize * 4;
   
   shapes.forEach((shape, index) => {
-    const offsetX = startX + index * shapeWidth + shapeWidth / 2;
+    const offsetX = startX + index * shapeWidth;
     const offsetY = startY + config.cellSize;
     
     shape.cells.forEach(([row, col]) => {
