@@ -51,11 +51,12 @@ export class GameRenderer {
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    const shapeStartX = this.config.width / 2 - (this.state.shapes.length * this.config.cellSize * 2) / 2;
-    const shapeAreaY = this.config.height - this.config.cellSize * 4;
+    const shapeWidth = this.config.cellSize * 2;
+    const shapeStartX = this.config.width / 2 - (this.state.shapes.length * shapeWidth) / 2;
+    const shapeAreaY = this.config.height - this.config.cellSize * 4 + this.config.cellSize; // 匹配 drawShapes 的偏移
     for (let i = 0; i < this.state.shapes.length; i++) {
-      const shapeX = shapeStartX + i * this.config.cellSize * 2;
-      if (x >= shapeX && x <= shapeX + this.config.cellSize * 2 && y >= shapeAreaY && y <= shapeAreaY + this.config.cellSize * 3) {
+      const shapeX = shapeStartX + i * shapeWidth;
+      if (x >= shapeX && x <= shapeX + shapeWidth && y >= shapeAreaY && y <= shapeAreaY + this.config.cellSize * 2) {
         this.dragState = { isDragging: true, shape: this.state.shapes[i], startX: x, startY: y, currentX: x, currentY: y, previewRow: -1, previewCol: -1, isValidPlacement: false };
         return;
       }
