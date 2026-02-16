@@ -39,176 +39,115 @@ class SoundManager {
       clearTimeout(this.currentBgMusicTimeout);
       this.currentBgMusicTimeout = null;
     }
+    if (this.scheduleBgMusicTimeout) {
+      clearTimeout(this.scheduleBgMusicTimeout);
+      this.scheduleBgMusicTimeout = null;
+    }
   }
   
-  private playRandomBgMusic(): void {
-    if (!this.bgMusicEnabled || !this.enabled || !this.audioContext || !this.bgMusicGain) return;
-    
-    // Randomly select one of 4 Russian-style music segments
-    const segments = [
-      this.playRussianFolk1.bind(this),
-      this.playRussianFolk2.bind(this),
-      this.playRussianFolk3.bind(this),
-      this.playRussianFolk4.bind(this),
-    ];
-    
-    const randomIndex = Math.floor(Math.random() * segments.length);
-    segments[randomIndex]();
-    
-    // Schedule next random segment (8-15 seconds)
-    const nextDelay = 8000 + Math.random() * 7000;
-    this.currentBgMusicTimeout = setTimeout(() => {
-      this.playRandomBgMusic();
-    }, nextDelay);
-  }
-  
-  // Russian Folk Segment 1 - Lively major melody (Kalinka style)
-  private playRussianFolk1(): void {
+  private readonly NOTE_FREQS: { [key: string]: number } = {
+    'B3': 246.94, 'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'F4': 349.23,
+    'F#4': 369.99, 'G4': 392.00, 'G#4': 415.30, 'A4': 440.00, 'B4': 493.88,
+    'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'F5': 698.46, 'A5': 880.00,
+    'E3': 164.81, 'A2': 110.00, 'B2': 123.47, 'C3': 130.81, 'D3': 146.83, 'G3': 196.00
+  };
+
+  private scheduleBgMusicTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  private playRussianFolkTheme(): void {
     if (!this.audioContext || !this.bgMusicGain) return;
     const ctx = this.audioContext;
-    const now = ctx.currentTime;
-    
-    // Lively Russian folk melody in G major
-    const melody = [
-      { note: 392, time: 0, dur: 0.25 },    // G4
-      { note: 440, time: 0.25, dur: 0.25 },  // A4
-      { note: 392, time: 0.5, dur: 0.25 },  // G4
-      { note: 349, time: 0.75, dur: 0.25 },  // F4
-      { note: 330, time: 1.0, dur: 0.5 },   // E4
-      { note: 294, time: 1.5, dur: 0.25 },  // D4
-      { note: 330, time: 1.75, dur: 0.25 },  // E4
-      { note: 392, time: 2.0, dur: 0.25 },  // G4
-      { note: 440, time: 2.25, dur: 0.25 }, // A4
-      { note: 392, time: 2.5, dur: 0.25 },  // G4
-      { note: 294, time: 2.75, dur: 0.5 },  // D4
+    const startTime = ctx.currentTime;
+
+    const tempo = 140;
+    const quarterNoteTime = 60 / tempo;
+
+    const melodyData = [
+      { n: 'E5', d: 1 }, { n: 'B4', d: 0.5 }, { n: 'C5', d: 0.5 }, { n: 'D5', d: 1 }, { n: 'C5', d: 0.5 }, { n: 'B4', d: 0.5 },
+      { n: 'A4', d: 1 }, { n: 'A4', d: 0.5 }, { n: 'C5', d: 0.5 }, { n: 'E5', d: 1 }, { n: 'D5', d: 0.5 }, { n: 'C5', d: 0.5 },
+      { n: 'B4', d: 1.5 }, { n: 'C5', d: 0.5 }, { n: 'D5', d: 1 }, { n: 'E5', d: 1 },
+      { n: 'C5', d: 1 }, { n: 'A4', d: 1 }, { n: 'A4', d: 1 }, { n: null, d: 1 },
+
+      { n: 'D5', d: 1.5 }, { n: 'F5', d: 0.5 }, { n: 'A5', d: 1 }, { n: 'G5', d: 0.5 }, { n: 'F5', d: 0.5 },
+      { n: 'E5', d: 1.5 }, { n: 'C5', d: 0.5 }, { n: 'E5', d: 1 }, { n: 'D5', d: 0.5 }, { n: 'C5', d: 0.5 },
+      { n: 'B4', d: 1 }, { n: 'B4', d: 0.5 }, { n: 'C5', d: 0.5 }, { n: 'D5', d: 1 }, { n: 'E5', d: 1 },
+      { n: 'C5', d: 1 }, { n: 'A4', d: 1 }, { n: 'A4', d: 2 },
     ];
-    
-    melody.forEach(({ note, time, dur }) => {
+
+    const bassData = [
+      { n: 'E3', d: 1 }, { n: 'E4', d: 1 }, { n: 'B2', d: 1 }, { n: 'E4', d: 1 },
+      { n: 'A2', d: 1 }, { n: 'A3', d: 1 }, { n: 'A2', d: 1 }, { n: 'A3', d: 1 },
+      { n: 'G3', d: 1 }, { n: 'G4', d: 1 }, { n: 'B2', d: 1 }, { n: 'E4', d: 1 },
+      { n: 'A2', d: 1 }, { n: 'A3', d: 1 }, { n: 'A2', d: 1 }, { n: 'A3', d: 1 },
+
+      { n: 'D3', d: 1 }, { n: 'D4', d: 1 }, { n: 'D3', d: 1 }, { n: 'D4', d: 1 },
+      { n: 'C3', d: 1 }, { n: 'C4', d: 1 }, { n: 'C3', d: 1 }, { n: 'C4', d: 1 },
+      { n: 'G3', d: 1 }, { n: 'B3', d: 1 }, { n: 'E3', d: 1 }, { n: 'G#4', d: 1 },
+      { n: 'A2', d: 1 }, { n: 'A3', d: 1 }, { n: 'A2', d: 1 }, { n: 'A3', d: 1 }
+    ];
+
+    const scheduleNote = (note: string | null, duration: number, time: number, type: 'square' | 'triangle' | 'sawtooth', volume: number) => {
+      if (!note) return;
+      const freq = this.NOTE_FREQS[note];
+      if (!freq) return;
+
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      osc.frequency.setValueAtTime(note, now + time);
-      osc.type = 'triangle';
-      gain.gain.setValueAtTime(0.3, now + time);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + time + dur);
+
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, time);
+
+      gain.gain.setValueAtTime(0, time);
+      gain.gain.linearRampToValueAtTime(volume, time + 0.05);
+      gain.gain.linearRampToValueAtTime(volume * 0.7, time + duration * 0.5);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + duration * 0.9);
+
       osc.connect(gain);
       gain.connect(this.bgMusicGain!);
-      osc.start(now + time);
-      osc.stop(now + time + dur);
-    });
-  }
-  
-  // Russian Folk Segment 2 - Minor key melody (Moscow nights style)
-  private playRussianFolk2(): void {
-    if (!this.audioContext || !this.bgMusicGain) return;
-    const ctx = this.audioContext;
-    const now = ctx.currentTime;
-    
-    // Minor key Russian melody in A minor
-    const melody = [
-      { note: 440, time: 0, dur: 0.3 },    // A4
-      { note: 392, time: 0.3, dur: 0.15 }, // G4
-      { note: 440, time: 0.45, dur: 0.3 }, // A4
-      { note: 392, time: 0.75, dur: 0.15 }, // G4
-      { note: 330, time: 0.9, dur: 0.3 },   // E4
-      { note: 294, time: 1.2, dur: 0.15 }, // D4
-      { note: 330, time: 1.35, dur: 0.3 },  // E4
-      { note: 392, time: 1.65, dur: 0.3 },  // G4
-      { note: 440, time: 1.95, dur: 0.3 },  // A4
-      { note: 392, time: 2.25, dur: 0.3 }, // G4
-      { note: 330, time: 2.55, dur: 0.6 },  // E4
-    ];
-    
-    melody.forEach(({ note, time, dur }) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.setValueAtTime(note, now + time);
-      osc.type = 'sine';
-      gain.gain.setValueAtTime(0.25, now + time);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + time + dur);
-      osc.connect(gain);
-      gain.connect(this.bgMusicGain!);
-      osc.start(now + time);
-      osc.stop(now + time + dur);
-    });
-  }
-  
-  // Russian Folk Segment 3 - Upbeat accordion style
-  private playRussianFolk3(): void {
-    if (!this.audioContext || !this.bgMusicGain) return;
-    const ctx = this.audioContext;
-    const now = ctx.currentTime;
-    
-    // Accordion-style rhythm in D minor
-    const melody = [
-      { note: 294, time: 0, dur: 0.15 },  // D4
-      { note: 330, time: 0.15, dur: 0.15 }, // E4
-      { note: 294, time: 0.3, dur: 0.15 },  // D4
-      { note: 220, time: 0.45, dur: 0.15 }, // A3
-      { note: 294, time: 0.6, dur: 0.15 },  // D4
-      { note: 330, time: 0.75, dur: 0.15 }, // E4
-      { note: 294, time: 0.9, dur: 0.15 },  // D4
-      { note: 220, time: 1.05, dur: 0.15 }, // A3
-      { note: 392, time: 1.2, dur: 0.15 },  // G4
-      { note: 440, time: 1.35, dur: 0.15 }, // A4
-      { note: 392, time: 1.5, dur: 0.15 },  // G4
-      { note: 330, time: 1.65, dur: 0.3 },  // E4
-      { note: 294, time: 1.95, dur: 0.15 }, // D4
-      { note: 330, time: 2.1, dur: 0.15 },  // E4
-      { note: 294, time: 2.25, dur: 0.3 },  // D4
-    ];
-    
-    melody.forEach(({ note, time, dur }) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.setValueAtTime(note, now + time);
-      osc.type = 'sawtooth';
-      gain.gain.setValueAtTime(0.2, now + time);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + time + dur);
-      osc.connect(gain);
-      gain.connect(this.bgMusicGain!);
-      osc.start(now + time);
-      osc.stop(now + time + dur);
-    });
-  }
-  
-  // Russian Folk Segment 4 - Cheerful dance melody
-  private playRussianFolk4(): void {
-    if (!this.audioContext || !this.bgMusicGain) return;
-    const ctx = this.audioContext;
-    const now = ctx.currentTime;
-    
-    // Cheerful dance in C major
-    const melody = [
-      { note: 523, time: 0, dur: 0.2 },   // C5
-      { note: 659, time: 0.2, dur: 0.1 },  // E5
-      { note: 784, time: 0.3, dur: 0.2 },  // G5
-      { note: 659, time: 0.5, dur: 0.1 },   // E5
-      { note: 523, time: 0.6, dur: 0.2 },  // C5
-      { note: 392, time: 0.8, dur: 0.2 },  // G4
-      { note: 440, time: 1.0, dur: 0.2 },   // A4
-      { note: 523, time: 1.2, dur: 0.2 },   // C5
-      { note: 659, time: 1.4, dur: 0.2 },  // E5
-      { note: 784, time: 1.6, dur: 0.3 },   // G5
-      { note: 880, time: 1.9, dur: 0.2 },   // A5
-      { note: 784, time: 2.1, dur: 0.2 },   // G5
-      { note: 659, time: 2.3, dur: 0.2 },   // E5
-      { note: 523, time: 2.5, dur: 0.5 },   // C5
-    ];
-    
-    melody.forEach(({ note, time, dur }) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.setValueAtTime(note, now + time);
-      osc.type = 'triangle';
-      gain.gain.setValueAtTime(0.25, now + time);
-      gain.gain.exponentialRampToValueAtTime(0.01, now + time + dur);
-      osc.connect(gain);
-      gain.connect(this.bgMusicGain!);
-      osc.start(now + time);
-      osc.stop(now + time + dur);
-    });
+
+      osc.start(time);
+      osc.stop(time + duration);
+    };
+
+    let cursor = startTime;
+    const loopCount = 4;
+
+    for (let l = 0; l < loopCount; l++) {
+      let melodyTime = cursor;
+      melodyData.forEach(item => {
+        const dur = item.d * quarterNoteTime;
+        scheduleNote(item.n, dur, melodyTime, 'square', 0.25);
+        melodyTime += dur;
+      });
+
+      let bassTime = cursor;
+      const melodyTotalTime = melodyData.reduce((acc, curr) => acc + curr.d, 0) * quarterNoteTime;
+
+      while (bassTime < cursor + melodyTotalTime - 0.1) {
+        bassData.forEach(item => {
+            if (bassTime >= cursor + melodyTotalTime - 0.1) return;
+            const dur = item.d * quarterNoteTime;
+            scheduleNote(item.n, dur, bassTime, 'triangle', 0.35);
+            bassTime += dur;
+        });
+      }
+
+      cursor += melodyTotalTime;
+    }
+
+    const totalDuration = (melodyData.reduce((acc, curr) => acc + curr.d, 0) * quarterNoteTime) * loopCount;
+    this.scheduleBgMusicTimeout = setTimeout(() => {
+      if (this.bgMusicEnabled) {
+        this.playRussianFolkTheme();
+      }
+    }, totalDuration * 1000);
   }
 
+  private playRandomBgMusic(): void {
+    if (!this.bgMusicEnabled || !this.enabled || !this.audioContext || !this.bgMusicGain) return;
+    this.playRussianFolkTheme();
+  }
+  
   private createOscillator(frequency: number, type: OscillatorType, startTime: number, duration: number, ctx: AudioContext): OscillatorNode {
     const osc = ctx.createOscillator();
     osc.frequency.setValueAtTime(frequency, startTime);
