@@ -1,20 +1,43 @@
 import { Shape, COLORS } from './types';
 
+// Block Blast style shapes (various sizes and configurations)
 const SHAPE_DEFINITIONS: [number, number][][] = [
-  // I-piece (4 in a line)
-  [[0, 0], [0, 1], [0, 2], [0, 3]],
-  // O-piece (2x2 square)
+  // Single block
+  [[0, 0]],
+  // Domino - horizontal
+  [[0, 0], [0, 1]],
+  // Domino - vertical
+  [[0, 0], [1, 0]],
+  // Triple - horizontal
+  [[0, 0], [0, 1], [0, 2]],
+  // Triple - vertical
+  [[0, 0], [1, 0], [2, 0]],
+  // L-shape (3 blocks)
+  [[0, 0], [1, 0], [1, 1]],
+  // L-shape mirrored
+  [[0, 0], [0, 1], [1, 0]],
+  // 2x2 square
   [[0, 0], [0, 1], [1, 0], [1, 1]],
-  // T-piece
+  // T-shape
   [[0, 0], [0, 1], [0, 2], [1, 1]],
-  // S-piece
+  // S-shape
   [[0, 1], [0, 2], [1, 0], [1, 1]],
-  // Z-piece
+  // Z-shape
   [[0, 0], [0, 1], [1, 1], [1, 2]],
-  // J-piece
-  [[0, 0], [1, 0], [1, 1], [1, 2]],
-  // L-piece
-  [[0, 2], [1, 0], [1, 1], [1, 2]],
+  // Line - 4 blocks
+  [[0, 0], [0, 1], [0, 2], [0, 3]],
+  // Line - 5 blocks
+  [[0, 0], [0, 1], [0, 2], [0, 3], [0, 4]],
+  // Big L (4 blocks)
+  [[0, 0], [1, 0], [2, 0], [2, 1]],
+  // Big L mirrored
+  [[0, 0], [0, 1], [0, 2], [1, 0]],
+  // Cross
+  [[0, 1], [1, 0], [1, 1], [1, 2], [2, 1]],
+  // 2x3 rectangle
+  [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2]],
+  // 3x3 square
+  [[0, 0], [0, 1], [0, 2], [1, 0], [1, 1], [1, 2], [2, 0], [2, 1], [2, 2]],
 ];
 
 let shapeIdCounter = 0;
