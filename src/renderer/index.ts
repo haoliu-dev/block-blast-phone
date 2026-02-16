@@ -91,7 +91,9 @@ export class GameRenderer {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const shapeWidth = this.config.cellSize * 4 * 0.7;
-    const shapeStartX = this.config.width / 2 - (this.state.shapes.length * shapeWidth) / 2;
+    // Always use fixed 3-slot layout to match rendering
+    const totalShapes = 3;
+    const shapeStartX = this.config.width / 2 - (totalShapes * shapeWidth) / 2;
     const shapeAreaY = this.config.height - this.config.cellSize * 5 + this.config.cellSize;
     for (let i = 0; i < this.state.shapes.length; i++) {
       const shapeX = shapeStartX + i * shapeWidth;
