@@ -222,11 +222,28 @@ export class GameRenderer {
     const centerX = this.config.gridOffsetX + (BOARD_SIZE * this.config.cellSize) / 2;
     const centerY = this.config.gridOffsetY + (BOARD_SIZE * this.config.cellSize) / 2;
     
+    // 根据消除行数随机选择中文词组
+    const texts: Record<number, string[]> = {
+      1: ['漂亮!', '精准!', '随意!', '洒脱!'],
+      2: ['超棒!', '厉害!', '精彩!', '起飞!'],
+      3: ['太强了!', '不可思议!', '全场欢呼!', '神操作!'],
+      4: ['无敌!', '炸裂!', '巅峰时刻!', '横扫千军!'],
+    };
+    
     let text = '';
-    if (lineCount >= 4) text = 'MEGA!';
-    else if (lineCount === 3) text = 'AMAZING!';
-    else if (lineCount === 2) text = 'GREAT!';
-    else text = 'NICE!';
+    if (lineCount >= 4) {
+      const options = texts[4];
+      text = options[Math.floor(Math.random() * options.length)];
+    } else if (lineCount === 3) {
+      const options = texts[3];
+      text = options[Math.floor(Math.random() * options.length)];
+    } else if (lineCount === 2) {
+      const options = texts[2];
+      text = options[Math.floor(Math.random() * options.length)];
+    } else {
+      const options = texts[1];
+      text = options[Math.floor(Math.random() * options.length)];
+    }
     
     this.addFloatingText(text, centerX, centerY);
 
