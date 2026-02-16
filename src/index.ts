@@ -8,8 +8,8 @@ function init(): void {
     return;
   }
   new GameRenderer(canvas);
-  canvas.addEventListener('touchstart', () => soundManager.init(), { once: true });
-  canvas.addEventListener('click', () => soundManager.init(), { once: true });
+  canvas.addEventListener('touchstart', () => soundManager.init().catch(console.error), { once: true });
+  canvas.addEventListener('click', () => soundManager.init().catch(console.error), { once: true });
 }
 
 if (typeof window !== 'undefined') {

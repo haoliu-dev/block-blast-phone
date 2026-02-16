@@ -4,8 +4,14 @@ class SoundManager {
   private audioContext: AudioContext | null = null;
   private enabled: boolean = false;
 
-  init(): void {
+  async init(): Promise<void> {
     this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    
+    // Resume audio context if it's suspended (browser autoplay policy)
+    if (this.audioContext.state === 'suspended') {
+      await this.audioContext.resume();
+    }
+    
     this.enabled = true;
   }
 
