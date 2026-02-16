@@ -50,6 +50,8 @@ export class GameRenderer {
   private screenShake: { intensity: number; decay: number } = { intensity: 0, decay: 0 };
   private scoreAnim: ScoreAnimation | null = null;
   private lastScore: number = 0;
+  private bgMusicEnabled: boolean = false;
+  private soundIconSize: number = 40;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -83,14 +85,28 @@ export class GameRenderer {
   }
 
   private handlePointerDown(e: PointerEvent): void {
+    // Check sound icon click (top-left corner)
+    const iconX = 20;
+    const iconY = 20;
+    const iconSize = this.soundIconSize;
+    const rect = this.canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    // Check if clicked on sound icon
+    if (x >= iconX - iconSize/2 && x <= iconX + iconSize/2 && 
+        y >= iconY - iconSize/2 && y <= iconY + iconSize/2) {
+      this.bgMusicEnabled = !this.bgMusicEnabled;
+      soundManager.setBgMusicEnabled(this.bgMusicEnabled);
+      this.render();
+      return;
+    }
+    
     if (this.state.status !== 'playing') {
       if (this.state.status === 'idle') this.dispatch({ type: 'START_GAME' as const });
       else if (this.state.status === 'gameover') this.dispatch({ type: 'RESTART' as const });
       return;
     }
-    const rect = this.canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
     const shapeWidth = this.config.cellSize * 4 * 0.7;
     // Always use fixed 3-slot layout to match rendering
     const totalShapes = 3;
@@ -426,6 +442,20 @@ export class GameRenderer {
     this.ctx.restore();
   }
 
+  private drawSoundIcon(): void {
+    const iconX = 20;
+    const iconY = 20;
+    const iconSize = this.soundIconSize;
+    
+    this.ctx.save();
+    this.ctx.font = '24px sans-serif';
+    this.ctx.textAlign = 'center';
+    this.ctx.textBaseline = 'middle';
+    this.ctx.fillStyle = this.bgMusicEnabled ? '#00FF00' : '#FF0000';
+    this.ctx.fillText(this.bgMusicEnabled ? '🔊' : '🔇', iconX, iconY);
+    this.ctx.restore();
+  }
+
   public render(): void {
     // Apply screen shake
     let shakeX = 0;
@@ -515,6 +545,9 @@ export class GameRenderer {
 
     // Draw score with animation
     this.drawScoreWithAnimation();
+    
+    // Draw sound icon (top-left corner)
+    this.drawSoundIcon();
     
     // Draw floating texts
     this.floatingTexts.forEach(t => {
