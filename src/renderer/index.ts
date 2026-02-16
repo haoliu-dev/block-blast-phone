@@ -382,8 +382,12 @@ export class GameRenderer {
     // 检测 pendingGameOverCheck，延迟显示 Game Over
     if (this.state.pendingGameOverCheck && oldStatus !== 'gameover') {
       setTimeout(() => {
+        const oldStatusBeforeCheck = this.state.status;
         this.dispatch({ type: 'CHECK_GAME_OVER' as const });
-        soundManager.play('gameover'); // 播放悲伤音效
+        // 只有真正变成 gameover 时才播放音效
+        if (this.state.status === 'gameover' && oldStatusBeforeCheck !== 'gameover') {
+          soundManager.play('gameover'); // 播放悲伤音效
+        }
       }, 1500);
     }
 

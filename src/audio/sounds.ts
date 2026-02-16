@@ -212,20 +212,33 @@ class SoundManager {
       }
       
       case 'gameover': {
-        // 悲伤的下降音效，持续 1.5 秒
-        const osc = ctx.createOscillator();
-        osc.frequency.setValueAtTime(300, now);
-        osc.frequency.exponentialRampToValueAtTime(50, now + 1.5);
-        osc.type = 'sawtooth';
+        // 四段式下降悲伤音效
+        const stages = [
+          { freq: 400, duration: 0.4, type: 'sawtooth' as OscillatorType, vol: 0.3 },
+          { freq: 300, duration: 0.4, type: 'sawtooth' as OscillatorType, vol: 0.25 },
+          { freq: 200, duration: 0.4, type: 'sawtooth' as OscillatorType, vol: 0.2 },
+          { freq: 100, duration: 0.5, type: 'sawtooth' as OscillatorType, vol: 0.15 },
+        ];
+        
+        let timeOffset = 0;
+        stages.forEach((stage) => {
+          const osc = ctx.createOscillator();
+          osc.frequency.setValueAtTime(stage.freq, now + timeOffset);
+          osc.frequency.exponentialRampToValueAtTime(stage.freq * 0.7, now + timeOffset + stage.duration);
+          osc.type = stage.type;
 
-        const gain = ctx.createGain();
-        gain.gain.setValueAtTime(0.3, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(0.001, now + timeOffset);
+          gain.gain.linearRampToValueAtTime(stage.vol, now + timeOffset + 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + timeOffset + stage.duration);
 
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 1.5);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(now + timeOffset);
+          osc.stop(now + timeOffset + stage.duration);
+          
+          timeOffset += stage.duration - 0.05; // 轻微重叠
+        });
         break;
       }
     }
