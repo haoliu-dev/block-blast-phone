@@ -73,12 +73,13 @@ class SoundManager {
   };
 
   private scheduleBgMusicTimeout: ReturnType<typeof setTimeout> | null = null;
+  private targetTempoMultiplier: number = 1.0;
 
   applyTempoChange(linesCleared: number): void {
     if (!this.isPlaying || !this.audioContext) return;
     
     const newMultiplier = 1.1 + 0.2 * linesCleared;
-    const duration = 2 + linesCleared * 2;
+    const duration = 4 + linesCleared * 2;
     const now = this.audioContext.currentTime;
     
     if (this.tempoChangeStack.length > 0) {
@@ -94,6 +95,7 @@ class SoundManager {
       this.tempoChangeStack.push({ multiplier: newMultiplier, endTime: now + duration });
     }
     
+    this.targetTempoMultiplier = newMultiplier;
     this.updateEffectiveTempo();
   }
 
@@ -102,9 +104,18 @@ class SoundManager {
     this.tempoChangeStack = this.tempoChangeStack.filter(t => t.endTime > now);
     
     if (this.tempoChangeStack.length > 0) {
-      this.tempoMultiplier = Math.max(...this.tempoChangeStack.map(t => t.multiplier));
+      const maxMultiplier = Math.max(...this.tempoChangeStack.map(t => t.multiplier));
+      this.targetTempoMultiplier = maxMultiplier;
     } else {
-      this.tempoMultiplier = 1.0;
+      this.targetTempoMultiplier = 1.0;
+    }
+  }
+
+  private updateTempoSmoothly(): void {
+    if (this.tempoMultiplier < this.targetTempoMultiplier) {
+      this.tempoMultiplier = this.targetTempoMultiplier;
+    } else if (this.tempoMultiplier > this.targetTempoMultiplier) {
+      this.tempoMultiplier += (this.targetTempoMultiplier - this.tempoMultiplier) * 0.05;
     }
   }
 
@@ -159,6 +170,7 @@ class SoundManager {
     if (!this.isPlaying || !this.audioContext || !this.bgMusicGain) return;
 
     this.updateEffectiveTempo();
+    this.updateTempoSmoothly();
     const ctx = this.audioContext;
     const currentTime = ctx.currentTime;
     const quarterNoteTime = (60 / this.BASE_TEMPO) / this.tempoMultiplier;
