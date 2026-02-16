@@ -55,18 +55,23 @@ export function drawScore(ctx: CanvasRenderingContext2D, state: GameState, confi
   ctx.fillText(`Lines: ${state.linesCleared}`, config.width / 2, 70);
 }
 
-export function drawShapes(ctx: CanvasRenderingContext2D, shapes: { cells: [number, number][]; color: number }[], config: CanvasConfig): void {
-  const shapeWidth = config.cellSize * 4;
+export function drawShapes(ctx: CanvasRenderingContext2D, shapes: { cells: [number, number][]; color: number }[], config: CanvasConfig, scale: number = 0.7): void {
+  const shapeWidth = config.cellSize * 4 * scale;
   const startX = config.width / 2 - (shapes.length * shapeWidth) / 2;
   const startY = config.height - config.cellSize * 5;
-  
+
   shapes.forEach((shape, index) => {
-    const offsetX = startX + index * shapeWidth;
+    const offsetX = startX + index * shapeWidth + shapeWidth / 2 - (2 * config.cellSize * scale);
     const offsetY = startY + config.cellSize;
-    
+
     shape.cells.forEach(([row, col]) => {
       ctx.fillStyle = COLORS[shape.color - 1];
-      ctx.fillRect(offsetX + col * config.cellSize, offsetY + row * config.cellSize, config.cellSize - 1, config.cellSize - 1);
+      ctx.fillRect(
+        offsetX + col * config.cellSize * scale,
+        offsetY + row * config.cellSize * scale,
+        config.cellSize * scale - 1,
+        config.cellSize * scale - 1
+      );
     });
   });
 }
