@@ -3,6 +3,9 @@ type SoundType = 'place' | 'placeFail' | 'clear' | 'clearDouble' | 'clearTriple'
 class SoundManager {
   private audioContext: AudioContext | null = null;
   private enabled: boolean = false;
+  private bgMusicEnabled: boolean = false;
+  private bgMusicGain: GainNode | null = null;
+  private currentBgMusicTimeout: ReturnType<typeof setTimeout> | null = null;
 
   async init(): Promise<void> {
     this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -12,10 +15,199 @@ class SoundManager {
       await this.audioContext.resume();
     }
     
+    // Create background music gain node
+    this.bgMusicGain = this.audioContext.createGain();
+    this.bgMusicGain.gain.setValueAtTime(0.15, this.audioContext.currentTime);
+    this.bgMusicGain.connect(this.audioContext.destination);
+    
     this.enabled = true;
   }
 
   setEnabled(enabled: boolean): void { this.enabled = enabled; }
+  
+  setBgMusicEnabled(enabled: boolean): void {
+    this.bgMusicEnabled = enabled;
+    if (enabled && this.enabled && this.bgMusicGain) {
+      this.playRandomBgMusic();
+    } else {
+      this.stopBgMusic();
+    }
+  }
+  
+  private stopBgMusic(): void {
+    if (this.currentBgMusicTimeout) {
+      clearTimeout(this.currentBgMusicTimeout);
+      this.currentBgMusicTimeout = null;
+    }
+  }
+  
+  private playRandomBgMusic(): void {
+    if (!this.bgMusicEnabled || !this.enabled || !this.audioContext || !this.bgMusicGain) return;
+    
+    // Randomly select one of 4 Russian-style music segments
+    const segments = [
+      this.playRussianFolk1.bind(this),
+      this.playRussianFolk2.bind(this),
+      this.playRussianFolk3.bind(this),
+      this.playRussianFolk4.bind(this),
+    ];
+    
+    const randomIndex = Math.floor(Math.random() * segments.length);
+    segments[randomIndex]();
+    
+    // Schedule next random segment (8-15 seconds)
+    const nextDelay = 8000 + Math.random() * 7000;
+    this.currentBgMusicTimeout = setTimeout(() => {
+      this.playRandomBgMusic();
+    }, nextDelay);
+  }
+  
+  // Russian Folk Segment 1 - Lively major melody (Kalinka style)
+  private playRussianFolk1(): void {
+    if (!this.audioContext || !this.bgMusicGain) return;
+    const ctx = this.audioContext;
+    const now = ctx.currentTime;
+    
+    // Lively Russian folk melody in G major
+    const melody = [
+      { note: 392, time: 0, dur: 0.25 },    // G4
+      { note: 440, time: 0.25, dur: 0.25 },  // A4
+      { note: 392, time: 0.5, dur: 0.25 },  // G4
+      { note: 349, time: 0.75, dur: 0.25 },  // F4
+      { note: 330, time: 1.0, dur: 0.5 },   // E4
+      { note: 294, time: 1.5, dur: 0.25 },  // D4
+      { note: 330, time: 1.75, dur: 0.25 },  // E4
+      { note: 392, time: 2.0, dur: 0.25 },  // G4
+      { note: 440, time: 2.25, dur: 0.25 }, // A4
+      { note: 392, time: 2.5, dur: 0.25 },  // G4
+      { note: 294, time: 2.75, dur: 0.5 },  // D4
+    ];
+    
+    melody.forEach(({ note, time, dur }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.setValueAtTime(note, now + time);
+      osc.type = 'triangle';
+      gain.gain.setValueAtTime(0.3, now + time);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + time + dur);
+      osc.connect(gain);
+      gain.connect(this.bgMusicGain!);
+      osc.start(now + time);
+      osc.stop(now + time + dur);
+    });
+  }
+  
+  // Russian Folk Segment 2 - Minor key melody (Moscow nights style)
+  private playRussianFolk2(): void {
+    if (!this.audioContext || !this.bgMusicGain) return;
+    const ctx = this.audioContext;
+    const now = ctx.currentTime;
+    
+    // Minor key Russian melody in A minor
+    const melody = [
+      { note: 440, time: 0, dur: 0.3 },    // A4
+      { note: 392, time: 0.3, dur: 0.15 }, // G4
+      { note: 440, time: 0.45, dur: 0.3 }, // A4
+      { note: 392, time: 0.75, dur: 0.15 }, // G4
+      { note: 330, time: 0.9, dur: 0.3 },   // E4
+      { note: 294, time: 1.2, dur: 0.15 }, // D4
+      { note: 330, time: 1.35, dur: 0.3 },  // E4
+      { note: 392, time: 1.65, dur: 0.3 },  // G4
+      { note: 440, time: 1.95, dur: 0.3 },  // A4
+      { note: 392, time: 2.25, dur: 0.3 }, // G4
+      { note: 330, time: 2.55, dur: 0.6 },  // E4
+    ];
+    
+    melody.forEach(({ note, time, dur }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.setValueAtTime(note, now + time);
+      osc.type = 'sine';
+      gain.gain.setValueAtTime(0.25, now + time);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + time + dur);
+      osc.connect(gain);
+      gain.connect(this.bgMusicGain!);
+      osc.start(now + time);
+      osc.stop(now + time + dur);
+    });
+  }
+  
+  // Russian Folk Segment 3 - Upbeat accordion style
+  private playRussianFolk3(): void {
+    if (!this.audioContext || !this.bgMusicGain) return;
+    const ctx = this.audioContext;
+    const now = ctx.currentTime;
+    
+    // Accordion-style rhythm in D minor
+    const melody = [
+      { note: 294, time: 0, dur: 0.15 },  // D4
+      { note: 330, time: 0.15, dur: 0.15 }, // E4
+      { note: 294, time: 0.3, dur: 0.15 },  // D4
+      { note: 220, time: 0.45, dur: 0.15 }, // A3
+      { note: 294, time: 0.6, dur: 0.15 },  // D4
+      { note: 330, time: 0.75, dur: 0.15 }, // E4
+      { note: 294, time: 0.9, dur: 0.15 },  // D4
+      { note: 220, time: 1.05, dur: 0.15 }, // A3
+      { note: 392, time: 1.2, dur: 0.15 },  // G4
+      { note: 440, time: 1.35, dur: 0.15 }, // A4
+      { note: 392, time: 1.5, dur: 0.15 },  // G4
+      { note: 330, time: 1.65, dur: 0.3 },  // E4
+      { note: 294, time: 1.95, dur: 0.15 }, // D4
+      { note: 330, time: 2.1, dur: 0.15 },  // E4
+      { note: 294, time: 2.25, dur: 0.3 },  // D4
+    ];
+    
+    melody.forEach(({ note, time, dur }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.setValueAtTime(note, now + time);
+      osc.type = 'sawtooth';
+      gain.gain.setValueAtTime(0.2, now + time);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + time + dur);
+      osc.connect(gain);
+      gain.connect(this.bgMusicGain!);
+      osc.start(now + time);
+      osc.stop(now + time + dur);
+    });
+  }
+  
+  // Russian Folk Segment 4 - Cheerful dance melody
+  private playRussianFolk4(): void {
+    if (!this.audioContext || !this.bgMusicGain) return;
+    const ctx = this.audioContext;
+    const now = ctx.currentTime;
+    
+    // Cheerful dance in C major
+    const melody = [
+      { note: 523, time: 0, dur: 0.2 },   // C5
+      { note: 659, time: 0.2, dur: 0.1 },  // E5
+      { note: 784, time: 0.3, dur: 0.2 },  // G5
+      { note: 659, time: 0.5, dur: 0.1 },   // E5
+      { note: 523, time: 0.6, dur: 0.2 },  // C5
+      { note: 392, time: 0.8, dur: 0.2 },  // G4
+      { note: 440, time: 1.0, dur: 0.2 },   // A4
+      { note: 523, time: 1.2, dur: 0.2 },   // C5
+      { note: 659, time: 1.4, dur: 0.2 },  // E5
+      { note: 784, time: 1.6, dur: 0.3 },   // G5
+      { note: 880, time: 1.9, dur: 0.2 },   // A5
+      { note: 784, time: 2.1, dur: 0.2 },   // G5
+      { note: 659, time: 2.3, dur: 0.2 },   // E5
+      { note: 523, time: 2.5, dur: 0.5 },   // C5
+    ];
+    
+    melody.forEach(({ note, time, dur }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.frequency.setValueAtTime(note, now + time);
+      osc.type = 'triangle';
+      gain.gain.setValueAtTime(0.25, now + time);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + time + dur);
+      osc.connect(gain);
+      gain.connect(this.bgMusicGain!);
+      osc.start(now + time);
+      osc.stop(now + time + dur);
+    });
+  }
 
   private createOscillator(frequency: number, type: OscillatorType, startTime: number, duration: number, ctx: AudioContext): OscillatorNode {
     const osc = ctx.createOscillator();
