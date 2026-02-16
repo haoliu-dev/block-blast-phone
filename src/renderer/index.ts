@@ -7,6 +7,27 @@ import { loadGameData } from '../storage/localStorage';
 import { canPlace } from '../logic/placement';
 import { soundManager } from '../audio/sounds';
 
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  color: string;
+  size: number;
+}
+
+interface FloatingText {
+  text: string;
+  x: number;
+  y: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  scale: number;
+}
+
 export class GameRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -14,7 +35,10 @@ export class GameRenderer {
   private state: GameState;
   private dragState: DragState;
   private linesToClear: { rows: number[]; cols: number[] } = { rows: [], cols: [] };
-  private animatingLines: { rows: number[]; cols: number[]; startTime: number } | null = null;
+  private animatingLines: { rows: number[]; cols: number[]; startTime: number; lineCount: number } | null = null;
+  private particles: Particle[] = [];
+  private floatingTexts: FloatingText[] = [];
+  private screenShake: { intensity: number; decay: number } = { intensity: 0, decay: 0 };
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -74,7 +98,6 @@ export class GameRenderer {
     this.dragState.currentX = x;
     this.dragState.currentY = y;
     
-    // Calculate grid position based on the visual center of the shape (offset from finger)
     const DRAG_OFFSET_BLOCKS = 4;
     const offsetY = y - DRAG_OFFSET_BLOCKS * this.config.cellSize;
     const gridPos = getGridPosition(x, offsetY, this.config);
@@ -99,10 +122,11 @@ export class GameRenderer {
   private handlePointerUp(_e: PointerEvent): void {
     if (this.dragState.isDragging && this.dragState.shape && this.dragState.isValidPlacement && this.dragState.previewRow >= 0) {
       const linesBefore = this.calculateLinesToClear(this.state.board, this.dragState.shape, this.dragState.previewRow, this.dragState.previewCol);
+      const lineCount = linesBefore.rows.length + linesBefore.cols.length;
       this.dispatch({ type: 'PLACE_SHAPE' as const, shape: this.dragState.shape, row: this.dragState.previewRow, col: this.dragState.previewCol });
       soundManager.play('place');
-      if (linesBefore.rows.length > 0 || linesBefore.cols.length > 0) {
-        this.startLineClearAnimation(linesBefore.rows, linesBefore.cols);
+      if (lineCount > 0) {
+        this.startLineClearAnimation(linesBefore.rows, linesBefore.cols, lineCount);
       }
     } else if (this.dragState.isDragging) {
       soundManager.play('placeFail');
@@ -130,18 +154,112 @@ export class GameRenderer {
     return { rows, cols };
   }
 
-  private startLineClearAnimation(rows: number[], cols: number[]): void {
-    this.animatingLines = { rows, cols, startTime: Date.now() };
-    soundManager.play('clear');
+  private createParticles(rows: number[], cols: number[]): void {
+    // Create particles for cleared cells
+    rows.forEach(row => {
+      for (let col = 0; col < BOARD_SIZE; col++) {
+        const x = this.config.gridOffsetX + col * this.config.cellSize + this.config.cellSize / 2;
+        const y = this.config.gridOffsetY + row * this.config.cellSize + this.config.cellSize / 2;
+        this.spawnParticles(x, y, 8);
+      }
+    });
+    
+    cols.forEach(col => {
+      for (let row = 0; row < BOARD_SIZE; row++) {
+        const x = this.config.gridOffsetX + col * this.config.cellSize + this.config.cellSize / 2;
+        const y = this.config.gridOffsetY + row * this.config.cellSize + this.config.cellSize / 2;
+        this.spawnParticles(x, y, 8);
+      }
+    });
+  }
+
+  private spawnParticles(x: number, y: number, count: number): void {
+    const colors = ['#FFD700', '#FFA500', '#FF6347', '#FFFFFF', '#00CED1'];
+    for (let i = 0; i < count; i++) {
+      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
+      const speed = 2 + Math.random() * 4;
+      this.particles.push({
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 2,
+        life: 1,
+        maxLife: 1,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        size: 3 + Math.random() * 5,
+      });
+    }
+  }
+
+  private addFloatingText(text: string, x: number, y: number): void {
+    this.floatingTexts.push({
+      text,
+      x,
+      y,
+      vy: -3,
+      life: 1,
+      maxLife: 1,
+      scale: 1,
+    });
+  }
+
+  private startLineClearAnimation(rows: number[], cols: number[], lineCount: number): void {
+    this.animatingLines = { rows, cols, startTime: Date.now(), lineCount };
+    
+    // Play appropriate sound
+    soundManager.playClear(lineCount);
+    
+    // Create particles
+    this.createParticles(rows, cols);
+    
+    // Screen shake for big clears
+    if (lineCount >= 2) {
+      this.screenShake.intensity = lineCount >= 4 ? 15 : 8;
+      this.screenShake.decay = 0.8;
+    }
+    
+    // Add floating text
+    const centerX = this.config.gridOffsetX + (BOARD_SIZE * this.config.cellSize) / 2;
+    const centerY = this.config.gridOffsetY + (BOARD_SIZE * this.config.cellSize) / 2;
+    
+    let text = '';
+    if (lineCount >= 4) text = 'MEGA!';
+    else if (lineCount === 3) text = 'AMAZING!';
+    else if (lineCount === 2) text = 'GREAT!';
+    else text = 'NICE!';
+    
+    this.addFloatingText(text, centerX, centerY);
 
     const animate = () => {
-      if (!this.animatingLines) return;
-      const elapsed = Date.now() - this.animatingLines.startTime;
-      if (elapsed > 500) {
+      if (!this.animatingLines && this.particles.length === 0 && this.floatingTexts.length === 0 && this.screenShake.intensity <= 0.1) return;
+      
+      const elapsed = Date.now() - (this.animatingLines?.startTime || 0);
+      if (elapsed > 800 && this.animatingLines) {
         this.animatingLines = null;
-        this.render();
-        return;
       }
+      
+      // Update particles
+      this.particles = this.particles.filter(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.2; // gravity
+        p.life -= 0.02;
+        return p.life > 0;
+      });
+      
+      // Update floating texts
+      this.floatingTexts = this.floatingTexts.filter(t => {
+        t.y += t.vy;
+        t.life -= 0.015;
+        t.scale = 1 + (1 - t.life) * 0.5;
+        return t.life > 0;
+      });
+      
+      // Decay screen shake
+      if (this.screenShake.intensity > 0) {
+        this.screenShake.intensity *= this.screenShake.decay;
+      }
+      
       this.render();
       requestAnimationFrame(animate);
     };
@@ -155,6 +273,17 @@ export class GameRenderer {
   }
 
   public render(): void {
+    // Apply screen shake
+    let shakeX = 0;
+    let shakeY = 0;
+    if (this.screenShake.intensity > 0.1) {
+      shakeX = (Math.random() - 0.5) * this.screenShake.intensity;
+      shakeY = (Math.random() - 0.5) * this.screenShake.intensity;
+    }
+    
+    this.ctx.save();
+    this.ctx.translate(shakeX, shakeY);
+    
     clearCanvas(this.ctx, this.config.width, this.config.height);
     drawBoard(this.ctx, this.config);
     drawState(this.ctx, this.state, this.config);
@@ -180,12 +309,15 @@ export class GameRenderer {
       });
     }
 
-    // Draw line clear animation
+    // Draw line clear flash animation
     if (this.animatingLines) {
       const elapsed = Date.now() - this.animatingLines.startTime;
-      const progress = elapsed / 500;
-      const alpha = 1 - progress;
-      this.ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+      const progress = Math.min(elapsed / 300, 1);
+      
+      // Flash effect
+      const flashAlpha = Math.sin(progress * Math.PI) * 0.8;
+      this.ctx.fillStyle = `rgba(255, 255, 100, ${flashAlpha})`;
+      
       this.animatingLines.rows.forEach(row => {
         this.ctx.fillRect(
           this.config.gridOffsetX,
@@ -204,12 +336,39 @@ export class GameRenderer {
       });
     }
 
+    // Draw particles
+    this.particles.forEach(p => {
+      const alpha = p.life / p.maxLife;
+      this.ctx.globalAlpha = alpha;
+      this.ctx.fillStyle = p.color;
+      this.ctx.beginPath();
+      this.ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+      this.ctx.fill();
+    });
+    this.ctx.globalAlpha = 1;
+
     drawScore(this.ctx, this.state, this.config);
+    
+    // Draw floating texts
+    this.floatingTexts.forEach(t => {
+      const alpha = t.life / t.maxLife;
+      this.ctx.save();
+      this.ctx.globalAlpha = alpha;
+      this.ctx.fillStyle = '#FFD700';
+      this.ctx.strokeStyle = '#FF6347';
+      this.ctx.lineWidth = 3;
+      this.ctx.font = `bold ${48 * t.scale}px sans-serif`;
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.strokeText(t.text, t.x, t.y);
+      this.ctx.fillText(t.text, t.x, t.y);
+      this.ctx.restore();
+    });
+    
     if (this.state.status === 'playing' && this.state.shapes.length > 0) {
       drawShapes(this.ctx, this.state.shapes, this.config, 0.7);
     }
     if (this.dragState.isDragging && this.dragState.shape) {
-      // Draw shape following finger at 1.0x scale, offset 4 blocks above finger
       const DRAG_OFFSET_BLOCKS = 4;
       const offsetY = DRAG_OFFSET_BLOCKS * this.config.cellSize;
       this.dragState.shape.cells.forEach(([row, col]: [number, number]) => {
@@ -218,7 +377,6 @@ export class GameRenderer {
         this.ctx.fillStyle = COLORS[this.dragState.shape!.color - 1];
         this.ctx.fillRect(x, y, this.config.cellSize - 2, this.config.cellSize - 2);
       });
-      // Draw preview on grid if valid
       if (this.dragState.previewRow >= 0 && this.dragState.isValidPlacement) {
         this.dragState.shape.cells.forEach(([row, col]: [number, number]) => {
           drawCell(this.ctx, this.dragState.previewRow + row, this.dragState.previewCol + col, this.dragState.shape!.color, this.config, 0.5);
@@ -227,6 +385,8 @@ export class GameRenderer {
     }
     if (this.state.status === 'idle') this.drawOverlay('Tap to Start');
     else if (this.state.status === 'gameover') this.drawOverlay(`Game Over!\nScore: ${this.state.score}\nTap to Restart`);
+    
+    this.ctx.restore();
   }
 
   private drawOverlay(text: string): void {
