@@ -536,11 +536,9 @@ export class GameRenderer {
     });
     
     if (this.state.status === 'playing' && this.state.shapes.length > 0) {
-      // Filter out the shape being dragged
-      const shapesToDraw = this.dragState.isDragging && this.dragState.shape
-        ? this.state.shapes.filter(s => s.id !== this.dragState.shape!.id)
-        : this.state.shapes;
-      drawShapes(this.ctx, shapesToDraw, this.config, 0.7);
+      // Pass the dragged shape ID to skip drawing it, but keep positions
+      const draggedId = this.dragState.isDragging && this.dragState.shape ? this.dragState.shape.id : undefined;
+      drawShapes(this.ctx, this.state.shapes, this.config, 0.7, draggedId);
     }
     if (this.dragState.isDragging && this.dragState.shape) {
       const DRAG_OFFSET_BLOCKS = 4;

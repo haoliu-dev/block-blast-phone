@@ -55,12 +55,16 @@ export function drawScore(ctx: CanvasRenderingContext2D, state: GameState, confi
   ctx.fillText(`Lines: ${state.linesCleared}`, config.width / 2, 70);
 }
 
-export function drawShapes(ctx: CanvasRenderingContext2D, shapes: { cells: [number, number][]; color: number }[], config: CanvasConfig, scale: number = 0.7): void {
+export function drawShapes(ctx: CanvasRenderingContext2D, shapes: { id?: string; cells: [number, number][]; color: number }[], config: CanvasConfig, scale: number = 0.7, skipId?: string): void {
   const shapeWidth = config.cellSize * 4 * scale;
-  const startX = config.width / 2 - (shapes.length * shapeWidth) / 2;
+  const totalShapes = 3; // Always reserve space for 3 shapes
+  const startX = config.width / 2 - (totalShapes * shapeWidth) / 2;
   const startY = config.height - config.cellSize * 5;
 
   shapes.forEach((shape, index) => {
+    // Skip drawing the shape being dragged
+    if (skipId && shape.id === skipId) return;
+
     const offsetX = startX + index * shapeWidth + shapeWidth / 2 - (2 * config.cellSize * scale);
     const offsetY = startY + config.cellSize;
 
