@@ -205,10 +205,11 @@ export class GameRenderer {
       drawShapes(this.ctx, this.state.shapes, this.config, 0.7);
     }
     if (this.dragState.isDragging && this.dragState.shape) {
-      // Draw shape following finger at 1.0x scale
+      // Draw shape following finger at 1.0x scale, offset 3 blocks above finger
+      const offsetY = 3 * this.config.cellSize;
       this.dragState.shape.cells.forEach(([row, col]: [number, number]) => {
         const x = this.dragState.currentX - this.config.cellSize / 2 + col * this.config.cellSize;
-        const y = this.dragState.currentY - this.config.cellSize / 2 + row * this.config.cellSize;
+        const y = this.dragState.currentY - this.config.cellSize / 2 + row * this.config.cellSize - offsetY;
         this.ctx.fillStyle = COLORS[this.dragState.shape!.color - 1];
         this.ctx.fillRect(x, y, this.config.cellSize - 2, this.config.cellSize - 2);
       });
