@@ -7,6 +7,19 @@ class SoundManager {
   private bgMusicGain: GainNode | null = null;
   private currentBgMusicTimeout: ReturnType<typeof setTimeout> | null = null;
 
+  private tempoMultiplier: number = 1.0;
+  private tempoChangeStack: { multiplier: number; endTime: number }[] = [];
+  private schedulerInterval: ReturnType<typeof setInterval> | null = null;
+  private nextNoteIndex: number = 0;
+  private nextBassIndex: number = 0;
+  private musicStartTime: number = 0;
+  private currentLoop: number = 0;
+  private isPlaying: boolean = false;
+
+  private readonly BASE_TEMPO = 140;
+  private readonly LOOKAHEAD = 0.1;
+  private readonly SCHEDULE_INTERVAL = 25;
+
   async init(): Promise<void> {
     this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     
@@ -43,6 +56,13 @@ class SoundManager {
       clearTimeout(this.scheduleBgMusicTimeout);
       this.scheduleBgMusicTimeout = null;
     }
+    if (this.schedulerInterval) {
+      clearInterval(this.schedulerInterval);
+      this.schedulerInterval = null;
+    }
+    this.isPlaying = false;
+    this.tempoMultiplier = 1.0;
+    this.tempoChangeStack = [];
   }
   
   private readonly NOTE_FREQS: { [key: string]: number } = {
@@ -54,93 +74,148 @@ class SoundManager {
 
   private scheduleBgMusicTimeout: ReturnType<typeof setTimeout> | null = null;
 
+  applyTempoChange(linesCleared: number): void {
+    if (!this.isPlaying || !this.audioContext) return;
+    
+    const multiplier = 1 + 0.1 * linesCleared;
+    const duration = 2 + linesCleared * 2;
+    const endTime = this.audioContext.currentTime + duration;
+    
+    this.tempoChangeStack.push({ multiplier, endTime });
+    this.updateEffectiveTempo();
+  }
+
+  private updateEffectiveTempo(): void {
+    const now = this.audioContext!.currentTime;
+    this.tempoChangeStack = this.tempoChangeStack.filter(t => t.endTime > now);
+    
+    if (this.tempoChangeStack.length > 0) {
+      this.tempoMultiplier = Math.max(...this.tempoChangeStack.map(t => t.multiplier));
+    } else {
+      this.tempoMultiplier = 1.0;
+    }
+  }
+
+  private readonly melodyData = [
+    { n: 'E5', d: 1 }, { n: 'B4', d: 0.5 }, { n: 'C5', d: 0.5 }, { n: 'D5', d: 1 }, { n: 'C5', d: 0.5 }, { n: 'B4', d: 0.5 },
+    { n: 'A4', d: 1 }, { n: 'A4', d: 0.5 }, { n: 'C5', d: 0.5 }, { n: 'E5', d: 1 }, { n: 'D5', d: 0.5 }, { n: 'C5', d: 0.5 },
+    { n: 'B4', d: 1.5 }, { n: 'C5', d: 0.5 }, { n: 'D5', d: 1 }, { n: 'E5', d: 1 },
+    { n: 'C5', d: 1 }, { n: 'A4', d: 1 }, { n: 'A4', d: 1 }, { n: null, d: 1 },
+    { n: 'D5', d: 1.5 }, { n: 'F5', d: 0.5 }, { n: 'A5', d: 1 }, { n: 'G5', d: 0.5 }, { n: 'F5', d: 0.5 },
+    { n: 'E5', d: 1.5 }, { n: 'C5', d: 0.5 }, { n: 'E5', d: 1 }, { n: 'D5', d: 0.5 }, { n: 'C5', d: 0.5 },
+    { n: 'B4', d: 1 }, { n: 'B4', d: 0.5 }, { n: 'C5', d: 0.5 }, { n: 'D5', d: 1 }, { n: 'E5', d: 1 },
+    { n: 'C5', d: 1 }, { n: 'A4', d: 1 }, { n: 'A4', d: 2 },
+  ];
+
+  private readonly bassData = [
+    { n: 'E3', d: 1 }, { n: 'E4', d: 1 }, { n: 'B2', d: 1 }, { n: 'E4', d: 1 },
+    { n: 'A2', d: 1 }, { n: 'A3', d: 1 }, { n: 'A2', d: 1 }, { n: 'A3', d: 1 },
+    { n: 'G3', d: 1 }, { n: 'G4', d: 1 }, { n: 'B2', d: 1 }, { n: 'E4', d: 1 },
+    { n: 'A2', d: 1 }, { n: 'A3', d: 1 }, { n: 'A2', d: 1 }, { n: 'A3', d: 1 },
+    { n: 'D3', d: 1 }, { n: 'D4', d: 1 }, { n: 'D3', d: 1 }, { n: 'D4', d: 1 },
+    { n: 'C3', d: 1 }, { n: 'C4', d: 1 }, { n: 'C3', d: 1 }, { n: 'C4', d: 1 },
+    { n: 'G3', d: 1 }, { n: 'B3', d: 1 }, { n: 'E3', d: 1 }, { n: 'G#4', d: 1 },
+    { n: 'A2', d: 1 }, { n: 'A3', d: 1 }, { n: 'A2', d: 1 }, { n: 'A3', d: 1 }
+  ];
+
+  private readonly melodyTotalBeats = this.melodyData.reduce((acc, curr) => acc + curr.d, 0);
+
+  private nextMelodyTime: number = 0;
+  private nextBassTime: number = 0;
+  private melodyInProgress: boolean = false;
+  private bassInProgress: boolean = false;
+
   private playRussianFolkTheme(): void {
     if (!this.audioContext || !this.bgMusicGain) return;
+    
+    this.isPlaying = true;
+    this.tempoMultiplier = 1.0;
+    this.tempoChangeStack = [];
+    this.musicStartTime = this.audioContext.currentTime;
+    this.nextMelodyTime = this.musicStartTime;
+    this.nextBassTime = this.musicStartTime;
+    this.currentLoop = 0;
+    this.nextNoteIndex = 0;
+    this.nextBassIndex = 0;
+    this.melodyInProgress = false;
+    this.bassInProgress = false;
+
+    this.schedulerInterval = setInterval(() => this.musicScheduler(), this.SCHEDULE_INTERVAL);
+  }
+
+  private musicScheduler(): void {
+    if (!this.isPlaying || !this.audioContext || !this.bgMusicGain) return;
+
+    this.updateEffectiveTempo();
     const ctx = this.audioContext;
-    const startTime = ctx.currentTime;
+    const currentTime = ctx.currentTime;
+    const quarterNoteTime = (60 / this.BASE_TEMPO) / this.tempoMultiplier;
 
-    const tempo = 140;
-    const quarterNoteTime = 60 / tempo;
-
-    const melodyData = [
-      { n: 'E5', d: 1 }, { n: 'B4', d: 0.5 }, { n: 'C5', d: 0.5 }, { n: 'D5', d: 1 }, { n: 'C5', d: 0.5 }, { n: 'B4', d: 0.5 },
-      { n: 'A4', d: 1 }, { n: 'A4', d: 0.5 }, { n: 'C5', d: 0.5 }, { n: 'E5', d: 1 }, { n: 'D5', d: 0.5 }, { n: 'C5', d: 0.5 },
-      { n: 'B4', d: 1.5 }, { n: 'C5', d: 0.5 }, { n: 'D5', d: 1 }, { n: 'E5', d: 1 },
-      { n: 'C5', d: 1 }, { n: 'A4', d: 1 }, { n: 'A4', d: 1 }, { n: null, d: 1 },
-
-      { n: 'D5', d: 1.5 }, { n: 'F5', d: 0.5 }, { n: 'A5', d: 1 }, { n: 'G5', d: 0.5 }, { n: 'F5', d: 0.5 },
-      { n: 'E5', d: 1.5 }, { n: 'C5', d: 0.5 }, { n: 'E5', d: 1 }, { n: 'D5', d: 0.5 }, { n: 'C5', d: 0.5 },
-      { n: 'B4', d: 1 }, { n: 'B4', d: 0.5 }, { n: 'C5', d: 0.5 }, { n: 'D5', d: 1 }, { n: 'E5', d: 1 },
-      { n: 'C5', d: 1 }, { n: 'A4', d: 1 }, { n: 'A4', d: 2 },
-    ];
-
-    const bassData = [
-      { n: 'E3', d: 1 }, { n: 'E4', d: 1 }, { n: 'B2', d: 1 }, { n: 'E4', d: 1 },
-      { n: 'A2', d: 1 }, { n: 'A3', d: 1 }, { n: 'A2', d: 1 }, { n: 'A3', d: 1 },
-      { n: 'G3', d: 1 }, { n: 'G4', d: 1 }, { n: 'B2', d: 1 }, { n: 'E4', d: 1 },
-      { n: 'A2', d: 1 }, { n: 'A3', d: 1 }, { n: 'A2', d: 1 }, { n: 'A3', d: 1 },
-
-      { n: 'D3', d: 1 }, { n: 'D4', d: 1 }, { n: 'D3', d: 1 }, { n: 'D4', d: 1 },
-      { n: 'C3', d: 1 }, { n: 'C4', d: 1 }, { n: 'C3', d: 1 }, { n: 'C4', d: 1 },
-      { n: 'G3', d: 1 }, { n: 'B3', d: 1 }, { n: 'E3', d: 1 }, { n: 'G#4', d: 1 },
-      { n: 'A2', d: 1 }, { n: 'A3', d: 1 }, { n: 'A2', d: 1 }, { n: 'A3', d: 1 }
-    ];
-
-    const scheduleNote = (note: string | null, duration: number, time: number, type: 'square' | 'triangle' | 'sawtooth', volume: number) => {
-      if (!note) return;
-      const freq = this.NOTE_FREQS[note];
-      if (!freq) return;
-
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      osc.type = type;
-      osc.frequency.setValueAtTime(freq, time);
-
-      gain.gain.setValueAtTime(0, time);
-      gain.gain.linearRampToValueAtTime(volume, time + 0.05);
-      gain.gain.linearRampToValueAtTime(volume * 0.7, time + duration * 0.5);
-      gain.gain.exponentialRampToValueAtTime(0.001, time + duration * 0.9);
-
-      osc.connect(gain);
-      gain.connect(this.bgMusicGain!);
-
-      osc.start(time);
-      osc.stop(time + duration);
-    };
-
-    let cursor = startTime;
-    const loopCount = 4;
-
-    for (let l = 0; l < loopCount; l++) {
-      let melodyTime = cursor;
-      melodyData.forEach(item => {
-        const dur = item.d * quarterNoteTime;
-        scheduleNote(item.n, dur, melodyTime, 'square', 0.25);
-        melodyTime += dur;
-      });
-
-      let bassTime = cursor;
-      const melodyTotalTime = melodyData.reduce((acc, curr) => acc + curr.d, 0) * quarterNoteTime;
-
-      while (bassTime < cursor + melodyTotalTime - 0.1) {
-        bassData.forEach(item => {
-            if (bassTime >= cursor + melodyTotalTime - 0.1) return;
-            const dur = item.d * quarterNoteTime;
-            scheduleNote(item.n, dur, bassTime, 'triangle', 0.35);
-            bassTime += dur;
-        });
+    while (this.nextMelodyTime < currentTime + this.LOOKAHEAD && this.currentLoop < 4) {
+      const note = this.melodyData[this.nextNoteIndex];
+      const dur = note.d * quarterNoteTime;
+      this.scheduleNote(note.n, dur, this.nextMelodyTime, 'square', 0.25);
+      this.nextMelodyTime += dur;
+      this.nextNoteIndex++;
+      if (this.nextNoteIndex >= this.melodyData.length) {
+        this.nextNoteIndex = 0;
+        this.currentLoop++;
+        if (this.currentLoop >= 4) break;
       }
-
-      cursor += melodyTotalTime;
     }
 
-    const totalDuration = (melodyData.reduce((acc, curr) => acc + curr.d, 0) * quarterNoteTime) * loopCount;
-    this.scheduleBgMusicTimeout = setTimeout(() => {
+    const melodyTotalTime = this.melodyTotalBeats * quarterNoteTime;
+    const loopStartTime = this.musicStartTime + this.currentLoop * melodyTotalTime;
+    const bassLoopDuration = this.bassData.reduce((acc, curr) => acc + curr.d, 0) * quarterNoteTime;
+
+    while (this.nextBassTime < currentTime + this.LOOKAHEAD && this.currentLoop < 4) {
+      const expectedBassTime = loopStartTime + (this.nextBassTime - loopStartTime) % bassLoopDuration;
+      if (this.nextBassTime >= loopStartTime - 0.1) {
+        const note = this.bassData[this.nextBassIndex];
+        const dur = note.d * quarterNoteTime;
+        this.scheduleNote(note.n, dur, this.nextBassTime, 'triangle', 0.35);
+        this.nextBassTime += dur;
+        this.nextBassIndex++;
+        if (this.nextBassIndex >= this.bassData.length) {
+          this.nextBassIndex = 0;
+        }
+      } else {
+        this.nextBassTime += quarterNoteTime;
+      }
+    }
+
+    if (this.currentLoop >= 4 && this.nextBassTime < loopStartTime + bassLoopDuration - 0.1) {
+      // Continue bass until it catches up
+    } else if (this.currentLoop >= 4 && this.nextMelodyTime >= loopStartTime + melodyTotalTime) {
+      this.stopBgMusic();
       if (this.bgMusicEnabled) {
         this.playRussianFolkTheme();
       }
-    }, totalDuration * 1000);
+    }
+  }
+
+  private scheduleNote(note: string | null, duration: number, time: number, type: 'square' | 'triangle' | 'sawtooth', volume: number): void {
+    if (!note || !this.audioContext || !this.bgMusicGain) return;
+    const freq = this.NOTE_FREQS[note];
+    if (!freq) return;
+
+    const ctx = this.audioContext;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, time);
+
+    gain.gain.setValueAtTime(0, time);
+    gain.gain.linearRampToValueAtTime(volume, time + 0.05);
+    gain.gain.linearRampToValueAtTime(volume * 0.7, time + duration * 0.5);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + duration * 0.9);
+
+    osc.connect(gain);
+    gain.connect(this.bgMusicGain);
+
+    osc.start(time);
+    osc.stop(time + duration);
   }
 
   private playRandomBgMusic(): void {
@@ -385,6 +460,10 @@ class SoundManager {
       this.play('clearDouble');
     } else {
       this.play('clear');
+    }
+    
+    if (linesCleared > 0) {
+      this.applyTempoChange(linesCleared);
     }
   }
 }
