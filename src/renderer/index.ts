@@ -1,7 +1,7 @@
 import { GameState, COLORS, BOARD_SIZE, Board } from '../logic/types';
 import { gameReducer } from '../logic/reducer';
 import { initCanvas, CanvasConfig, clearCanvas } from './canvas';
-import { drawBoard, drawState, drawScore, drawShapes, drawCell } from './draw';
+import { drawBoard, drawState, drawShapes, drawCell } from './draw';
 import { DragState, createInitialDragState, getGridPosition } from './input';
 import { loadGameData } from '../storage/localStorage';
 import { canPlace } from '../logic/placement';
@@ -16,6 +16,7 @@ interface Particle {
   maxLife: number;
   color: string;
   size: number;
+  type?: 'normal' | 'electric' | 'spark';
 }
 
 interface FloatingText {
@@ -26,6 +27,14 @@ interface FloatingText {
   life: number;
   maxLife: number;
   scale: number;
+  lineCount: number;
+}
+
+interface ScoreAnimation {
+  value: number;
+  displayValue: number;
+  startTime: number;
+  duration: number;
 }
 
 export class GameRenderer {
@@ -39,6 +48,8 @@ export class GameRenderer {
   private particles: Particle[] = [];
   private floatingTexts: FloatingText[] = [];
   private screenShake: { intensity: number; decay: number } = { intensity: 0, decay: 0 };
+  private scoreAnim: ScoreAnimation | null = null;
+  private lastScore: number = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -52,6 +63,7 @@ export class GameRenderer {
       status: 'idle',
       highScore: savedData.highScore,
     };
+    this.lastScore = 0;
     this.dragState = createInitialDragState();
     this.init();
   }
@@ -154,13 +166,13 @@ export class GameRenderer {
     return { rows, cols };
   }
 
-  private createParticles(rows: number[], cols: number[]): void {
+  private createParticles(rows: number[], cols: number[], lineCount: number): void {
     // Create particles for cleared cells
     rows.forEach(row => {
       for (let col = 0; col < BOARD_SIZE; col++) {
         const x = this.config.gridOffsetX + col * this.config.cellSize + this.config.cellSize / 2;
         const y = this.config.gridOffsetY + row * this.config.cellSize + this.config.cellSize / 2;
-        this.spawnParticles(x, y, 8);
+        this.spawnParticles(x, y, 8, lineCount);
       }
     });
     
@@ -168,13 +180,28 @@ export class GameRenderer {
       for (let row = 0; row < BOARD_SIZE; row++) {
         const x = this.config.gridOffsetX + col * this.config.cellSize + this.config.cellSize / 2;
         const y = this.config.gridOffsetY + row * this.config.cellSize + this.config.cellSize / 2;
-        this.spawnParticles(x, y, 8);
+        this.spawnParticles(x, y, 8, lineCount);
       }
     });
+
+    // Electric sparks for 4+ lines
+    if (lineCount >= 4) {
+      this.spawnElectricSparks();
+    }
   }
 
-  private spawnParticles(x: number, y: number, count: number): void {
-    const colors = ['#FFD700', '#FFA500', '#FF6347', '#FFFFFF', '#00CED1'];
+  private spawnParticles(x: number, y: number, count: number, lineCount: number): void {
+    let colors: string[];
+    
+    // Color schemes based on line count
+    if (lineCount >= 4) {
+      colors = ['#FFD700', '#FF4500', '#FF6347', '#FFA500', '#FFFF00']; // Gold and fire
+    } else if (lineCount === 3) {
+      colors = ['#FF8C00', '#FF6347', '#DA70D6', '#FF1493', '#FF69B4']; // Orange and purple
+    } else {
+      colors = ['#00CED1', '#20B2AA', '#48D1CC', '#40E0D0', '#00FA9A']; // Cyan and emerald
+    }
+    
     for (let i = 0; i < count; i++) {
       const angle = (Math.PI * 2 * i) / count + Math.random() * 0.5;
       const speed = 2 + Math.random() * 4;
@@ -187,11 +214,33 @@ export class GameRenderer {
         maxLife: 1,
         color: colors[Math.floor(Math.random() * colors.length)],
         size: 3 + Math.random() * 5,
+        type: 'normal',
       });
     }
   }
 
-  private addFloatingText(text: string, x: number, y: number): void {
+  private spawnElectricSparks(): void {
+    const centerX = this.config.gridOffsetX + (BOARD_SIZE * this.config.cellSize) / 2;
+    const centerY = this.config.gridOffsetY + (BOARD_SIZE * this.config.cellSize) / 2;
+    
+    for (let i = 0; i < 20; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = 50 + Math.random() * 100;
+      this.particles.push({
+        x: centerX + Math.cos(angle) * distance,
+        y: centerY + Math.sin(angle) * distance,
+        vx: Math.cos(angle) * (2 + Math.random() * 3),
+        vy: Math.sin(angle) * (2 + Math.random() * 3),
+        life: 1,
+        maxLife: 1,
+        color: '#FFFFFF',
+        size: 2 + Math.random() * 3,
+        type: 'electric',
+      });
+    }
+  }
+
+  private addFloatingText(text: string, x: number, y: number, lineCount: number): void {
     this.floatingTexts.push({
       text,
       x,
@@ -200,7 +249,24 @@ export class GameRenderer {
       life: 1,
       maxLife: 1,
       scale: 1,
+      lineCount,
     });
+  }
+
+  private startScoreAnimation(points: number): void {
+    if (points <= 0) return;
+    
+    this.scoreAnim = {
+      value: this.state.score,
+      displayValue: this.lastScore,
+      startTime: Date.now(),
+      duration: 1000,
+    };
+    
+    this.lastScore = this.state.score;
+    
+    // Play score sound
+    soundManager.play('place');
   }
 
   private startLineClearAnimation(rows: number[], cols: number[], lineCount: number): void {
@@ -209,8 +275,8 @@ export class GameRenderer {
     // Play appropriate sound
     soundManager.playClear(lineCount);
     
-    // Create particles
-    this.createParticles(rows, cols);
+    // Create particles with color scheme
+    this.createParticles(rows, cols, lineCount);
     
     // Screen shake for big clears
     if (lineCount >= 2) {
@@ -245,10 +311,11 @@ export class GameRenderer {
       text = options[Math.floor(Math.random() * options.length)];
     }
     
-    this.addFloatingText(text, centerX, centerY);
+    this.addFloatingText(text, centerX, centerY, lineCount);
 
     const animate = () => {
-      if (!this.animatingLines && this.particles.length === 0 && this.floatingTexts.length === 0 && this.screenShake.intensity <= 0.1) return;
+      if (!this.animatingLines && this.particles.length === 0 && this.floatingTexts.length === 0 && 
+          this.screenShake.intensity <= 0.1 && !this.scoreAnim) return;
       
       const elapsed = Date.now() - (this.animatingLines?.startTime || 0);
       if (elapsed > 800 && this.animatingLines) {
@@ -277,6 +344,21 @@ export class GameRenderer {
         this.screenShake.intensity *= this.screenShake.decay;
       }
       
+      // Update score animation
+      if (this.scoreAnim) {
+        const scoreElapsed = Date.now() - this.scoreAnim.startTime;
+        const progress = Math.min(scoreElapsed / this.scoreAnim.duration, 1);
+        
+        // Easing function
+        const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+        this.scoreAnim.displayValue = Math.floor(this.scoreAnim.displayValue + 
+          (this.scoreAnim.value - this.scoreAnim.displayValue) * easeOutQuart);
+        
+        if (progress >= 1) {
+          this.scoreAnim = null;
+        }
+      }
+      
       this.render();
       requestAnimationFrame(animate);
     };
@@ -285,8 +367,47 @@ export class GameRenderer {
   }
 
   private dispatch(action: { type: string; shape?: any; row?: number; col?: number }): void {
+    const oldScore = this.state.score;
     this.state = gameReducer(this.state, action as any);
+    
+    // Check if score increased
+    if (this.state.score > oldScore) {
+      this.startScoreAnimation(this.state.score - oldScore);
+    }
+    
     this.render();
+  }
+
+  private drawScoreWithAnimation(): void {
+    const score = this.scoreAnim ? this.scoreAnim.displayValue : this.state.score;
+    const isAnimating = this.scoreAnim !== null;
+    
+    this.ctx.save();
+    
+    if (isAnimating) {
+      // Bounce effect during animation
+      const bounce = Math.sin(Date.now() / 50) * 5;
+      this.ctx.translate(0, bounce);
+      this.ctx.fillStyle = '#FFD700';
+      this.ctx.shadowColor = '#FFA500';
+      this.ctx.shadowBlur = 20;
+    } else {
+      this.ctx.fillStyle = '#ffffff';
+    }
+    
+    this.ctx.font = 'bold 32px sans-serif';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText(`Score: ${score}`, this.config.width / 2, 50);
+    
+    if (isAnimating) {
+      this.ctx.shadowBlur = 0;
+    }
+    
+    this.ctx.font = '16px sans-serif';
+    this.ctx.fillStyle = '#aaaaaa';
+    this.ctx.fillText(`Lines: ${this.state.linesCleared}`, this.config.width / 2, 80);
+    
+    this.ctx.restore();
   }
 
   public render(): void {
@@ -357,22 +478,54 @@ export class GameRenderer {
     this.particles.forEach(p => {
       const alpha = p.life / p.maxLife;
       this.ctx.globalAlpha = alpha;
-      this.ctx.fillStyle = p.color;
-      this.ctx.beginPath();
-      this.ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
-      this.ctx.fill();
+      
+      if (p.type === 'electric') {
+        // Draw electric spark
+        this.ctx.strokeStyle = p.color;
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.moveTo(p.x, p.y);
+        this.ctx.lineTo(p.x + (Math.random() - 0.5) * 20, p.y + (Math.random() - 0.5) * 20);
+        this.ctx.stroke();
+      } else {
+        // Draw normal particle
+        this.ctx.fillStyle = p.color;
+        this.ctx.beginPath();
+        this.ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+        this.ctx.fill();
+      }
     });
     this.ctx.globalAlpha = 1;
 
-    drawScore(this.ctx, this.state, this.config);
+    // Draw score with animation
+    this.drawScoreWithAnimation();
     
     // Draw floating texts
     this.floatingTexts.forEach(t => {
       const alpha = t.life / t.maxLife;
       this.ctx.save();
       this.ctx.globalAlpha = alpha;
-      this.ctx.fillStyle = '#FFD700';
-      this.ctx.strokeStyle = '#FF6347';
+      
+      // Style based on line count
+      if (t.lineCount >= 4) {
+        // 4+ lines: Gold/Fire with electric effect
+        this.ctx.fillStyle = '#FFD700';
+        this.ctx.strokeStyle = '#FF4500';
+        this.ctx.shadowColor = '#FF6347';
+        this.ctx.shadowBlur = 20 + Math.sin(Date.now() / 50) * 10;
+      } else if (t.lineCount === 3) {
+        // 3 lines: Orange/Purple with glow
+        this.ctx.fillStyle = '#FF8C00';
+        this.ctx.strokeStyle = '#DA70D6';
+        this.ctx.shadowColor = '#FF1493';
+        this.ctx.shadowBlur = 15;
+      } else {
+        // 1-2 lines: Cyan/Emerald with white stroke
+        this.ctx.fillStyle = '#00CED1';
+        this.ctx.strokeStyle = '#FFFFFF';
+        this.ctx.shadowBlur = 0;
+      }
+      
       this.ctx.lineWidth = 3;
       this.ctx.font = `bold ${48 * t.scale}px sans-serif`;
       this.ctx.textAlign = 'center';
