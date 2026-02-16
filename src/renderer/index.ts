@@ -536,7 +536,11 @@ export class GameRenderer {
     });
     
     if (this.state.status === 'playing' && this.state.shapes.length > 0) {
-      drawShapes(this.ctx, this.state.shapes, this.config, 0.7);
+      // Filter out the shape being dragged
+      const shapesToDraw = this.dragState.isDragging && this.dragState.shape
+        ? this.state.shapes.filter(s => s.id !== this.dragState.shape!.id)
+        : this.state.shapes;
+      drawShapes(this.ctx, shapesToDraw, this.config, 0.7);
     }
     if (this.dragState.isDragging && this.dragState.shape) {
       const DRAG_OFFSET_BLOCKS = 4;
