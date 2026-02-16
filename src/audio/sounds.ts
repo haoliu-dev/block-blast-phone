@@ -212,15 +212,20 @@ class SoundManager {
       }
       
       case 'gameover': {
-        const osc = this.createOscillator(400, 'sine', now, 1.0, ctx);
-        const gain = this.createGain(0.2, now, ctx);
-        osc.frequency.exponentialRampToValueAtTime(100, now + 1.0);
-        gain.gain.setValueAtTime(0.2, now);
-        gain.gain.linearRampToValueAtTime(0.001, now + 1.0);
+        // 悲伤的下降音效，持续 1.5 秒
+        const osc = ctx.createOscillator();
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.exponentialRampToValueAtTime(50, now + 1.5);
+        osc.type = 'sawtooth';
+
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
+
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(now);
-        osc.stop(now + 1.0);
+        osc.stop(now + 1.5);
         break;
       }
     }

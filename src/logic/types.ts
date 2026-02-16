@@ -16,6 +16,7 @@ export interface GameState {
   linesCleared: number;
   status: GameStatus;
   highScore: number;
+  pendingGameOverCheck: boolean;
 }
 
 export interface Point {
@@ -26,6 +27,7 @@ export interface Point {
 export type GameAction =
   | { type: 'START_GAME' }
   | { type: 'PLACE_SHAPE'; shape: Shape; row: number; col: number }
+  | { type: 'CHECK_GAME_OVER' }
   | { type: 'RESTART' }
   | { type: 'SET_HIGH_SCORE'; score: number };
 

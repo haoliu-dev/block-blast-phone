@@ -62,6 +62,7 @@ export class GameRenderer {
       linesCleared: 0,
       status: 'idle',
       highScore: savedData.highScore,
+      pendingGameOverCheck: false,
     };
     this.lastScore = 0;
     this.dragState = createInitialDragState();
@@ -370,13 +371,22 @@ export class GameRenderer {
 
   private dispatch(action: { type: string; shape?: any; row?: number; col?: number }): void {
     const oldScore = this.state.score;
+    const oldStatus = this.state.status;
     this.state = gameReducer(this.state, action as any);
-    
+
     // Check if score increased
     if (this.state.score > oldScore) {
       this.startScoreAnimation(this.state.score - oldScore);
     }
-    
+
+    // 检测 pendingGameOverCheck，延迟显示 Game Over
+    if (this.state.pendingGameOverCheck && oldStatus !== 'gameover') {
+      setTimeout(() => {
+        this.dispatch({ type: 'CHECK_GAME_OVER' as const });
+        soundManager.play('gameover'); // 播放悲伤音效
+      }, 1500);
+    }
+
     this.render();
   }
 

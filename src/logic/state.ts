@@ -15,5 +15,6 @@ export function createInitialState(highScore: number = 0): GameState {
     linesCleared: 0,
     status: 'idle',
     highScore,
+    pendingGameOverCheck: false,
   };
 }

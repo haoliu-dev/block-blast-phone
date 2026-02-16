@@ -37,6 +37,19 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
 
       if (remainingShapes.length === 0) {
         newShapes = createShapes(3);
+        // 新形状生成后，不立即检查游戏结束
+        // 而是返回状态让玩家看到新形状
+        const newHighScore = Math.max(state.highScore, newScore);
+        return {
+          ...state,
+          board: newBoard,
+          shapes: newShapes,
+          score: newScore,
+          linesCleared: newLinesCleared,
+          status: 'playing', // 保持 playing，不立即 gameover
+          highScore: newHighScore,
+          pendingGameOverCheck: true, // 标记需要检查游戏结束
+        };
       }
 
       const isOver = checkGameOver(newBoard, newShapes);
@@ -50,6 +63,16 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         linesCleared: newLinesCleared,
         status: isOver ? 'gameover' : 'playing',
         highScore: newHighScore,
+        pendingGameOverCheck: false,
+      };
+    }
+
+    case 'CHECK_GAME_OVER': {
+      const isOver = checkGameOver(state.board, state.shapes);
+      return {
+        ...state,
+        status: isOver ? 'gameover' : 'playing',
+        pendingGameOverCheck: false,
       };
     }
 
