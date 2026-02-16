@@ -73,7 +73,11 @@ export class GameRenderer {
     const y = e.clientY - rect.top;
     this.dragState.currentX = x;
     this.dragState.currentY = y;
-    const gridPos = getGridPosition(x, y, this.config);
+    
+    // Calculate grid position based on the visual center of the shape (offset from finger)
+    const DRAG_OFFSET_BLOCKS = 4;
+    const offsetY = y - DRAG_OFFSET_BLOCKS * this.config.cellSize;
+    const gridPos = getGridPosition(x, offsetY, this.config);
     if (gridPos) {
       this.dragState.previewRow = gridPos.row;
       this.dragState.previewCol = gridPos.col;
@@ -205,8 +209,9 @@ export class GameRenderer {
       drawShapes(this.ctx, this.state.shapes, this.config, 0.7);
     }
     if (this.dragState.isDragging && this.dragState.shape) {
-      // Draw shape following finger at 1.0x scale, offset 3 blocks above finger
-      const offsetY = 3 * this.config.cellSize;
+      // Draw shape following finger at 1.0x scale, offset 4 blocks above finger
+      const DRAG_OFFSET_BLOCKS = 4;
+      const offsetY = DRAG_OFFSET_BLOCKS * this.config.cellSize;
       this.dragState.shape.cells.forEach(([row, col]: [number, number]) => {
         const x = this.dragState.currentX - this.config.cellSize / 2 + col * this.config.cellSize;
         const y = this.dragState.currentY - this.config.cellSize / 2 + row * this.config.cellSize - offsetY;
