@@ -1,5 +1,7 @@
 type SoundType = 'place' | 'placeFail' | 'clear' | 'clearDouble' | 'clearTriple' | 'clearMega' | 'combo' | 'gameover';
 
+import { loadGameData, saveGameData } from '../storage/localStorage';
+
 class SoundManager {
   private audioContext: AudioContext | null = null;
   private enabled: boolean = false;
@@ -33,13 +35,28 @@ class SoundManager {
     this.bgMusicGain.gain.setValueAtTime(0.15, this.audioContext.currentTime);
     this.bgMusicGain.connect(this.audioContext.destination);
     
+    // Load bg music setting from localStorage
+    const savedData = loadGameData();
+    this.bgMusicEnabled = savedData.settings.bgMusicEnabled;
+    
     this.enabled = true;
+    
+    // Start bg music if it was enabled
+    if (this.bgMusicEnabled) {
+      this.playRandomBgMusic();
+    }
   }
 
   setEnabled(enabled: boolean): void { this.enabled = enabled; }
   
   setBgMusicEnabled(enabled: boolean): void {
     this.bgMusicEnabled = enabled;
+    
+    // Save to localStorage
+    const savedData = loadGameData();
+    savedData.settings.bgMusicEnabled = enabled;
+    saveGameData(savedData);
+    
     if (enabled && this.enabled && this.bgMusicGain) {
       this.playRandomBgMusic();
     } else {

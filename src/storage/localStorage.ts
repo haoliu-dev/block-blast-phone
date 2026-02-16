@@ -3,6 +3,7 @@ interface GameData {
   settings: {
     soundEnabled: boolean;
     vibrationEnabled: boolean;
+    bgMusicEnabled: boolean;
   };
 }
 
@@ -17,7 +18,7 @@ export function loadGameData(): GameData {
   } catch (e) {
     console.warn('Failed to load game data:', e);
   }
-  return { highScore: 0, settings: { soundEnabled: false, vibrationEnabled: false } };
+  return { highScore: 0, settings: { soundEnabled: false, vibrationEnabled: false, bgMusicEnabled: false } };
 }
 
 export function saveGameData(data: GameData): void {
