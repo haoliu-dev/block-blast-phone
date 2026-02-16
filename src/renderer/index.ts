@@ -1,10 +1,11 @@
-import { GameState } from '../logic/types';
+import { GameState, COLORS } from '../logic/types';
 import { gameReducer } from '../logic/reducer';
 import { initCanvas, CanvasConfig, clearCanvas } from './canvas';
 import { drawBoard, drawState, drawScore, drawShapes, drawCell } from './draw';
 import { DragState, createInitialDragState, getGridPosition } from './input';
 import { loadGameData } from '../storage/localStorage';
 import { canPlace } from '../logic/placement';
+import { soundManager } from '../audio/sounds';
 
 export class GameRenderer {
   private canvas: HTMLCanvasElement;
@@ -51,12 +52,12 @@ export class GameRenderer {
     const rect = this.canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    const shapeWidth = this.config.cellSize * 2;
+    const shapeWidth = this.config.cellSize * 4;
     const shapeStartX = this.config.width / 2 - (this.state.shapes.length * shapeWidth) / 2;
-    const shapeAreaY = this.config.height - this.config.cellSize * 4 + this.config.cellSize; // 匹配 drawShapes 的偏移
+    const shapeAreaY = this.config.height - this.config.cellSize * 5 + this.config.cellSize; // 匹配 drawShapes 的偏移
     for (let i = 0; i < this.state.shapes.length; i++) {
       const shapeX = shapeStartX + i * shapeWidth;
-      if (x >= shapeX && x <= shapeX + shapeWidth && y >= shapeAreaY && y <= shapeAreaY + this.config.cellSize * 2) {
+      if (x >= shapeX && x <= shapeX + shapeWidth && y >= shapeAreaY && y <= shapeAreaY + this.config.cellSize * 4) {
         this.dragState = { isDragging: true, shape: this.state.shapes[i], startX: x, startY: y, currentX: x, currentY: y, previewRow: -1, previewCol: -1, isValidPlacement: false };
         return;
       }
@@ -85,6 +86,9 @@ export class GameRenderer {
   private handlePointerUp(_e: PointerEvent): void {
     if (this.dragState.isDragging && this.dragState.shape && this.dragState.isValidPlacement && this.dragState.previewRow >= 0) {
       this.dispatch({ type: 'PLACE_SHAPE' as const, shape: this.dragState.shape, row: this.dragState.previewRow, col: this.dragState.previewCol });
+      soundManager.play('place');
+    } else if (this.dragState.isDragging) {
+      soundManager.play('placeFail');
     }
     this.dragState = createInitialDragState();
     this.render();
@@ -103,10 +107,20 @@ export class GameRenderer {
     if (this.state.status === 'playing' && this.state.shapes.length > 0) {
       drawShapes(this.ctx, this.state.shapes, this.config);
     }
-    if (this.dragState.isDragging && this.dragState.shape && this.dragState.previewRow >= 0 && this.dragState.isValidPlacement) {
+    if (this.dragState.isDragging && this.dragState.shape) {
+      // Draw shape following finger
       this.dragState.shape.cells.forEach(([row, col]: [number, number]) => {
-        drawCell(this.ctx, this.dragState.previewRow + row, this.dragState.previewCol + col, this.dragState.shape!.color, this.config, 0.5);
+        const x = this.dragState.currentX - this.config.cellSize / 2 + col * this.config.cellSize;
+        const y = this.dragState.currentY - this.config.cellSize / 2 + row * this.config.cellSize;
+        this.ctx.fillStyle = COLORS[this.dragState.shape!.color - 1];
+        this.ctx.fillRect(x, y, this.config.cellSize - 1, this.config.cellSize - 1);
       });
+      // Draw preview on grid if valid
+      if (this.dragState.previewRow >= 0 && this.dragState.isValidPlacement) {
+        this.dragState.shape.cells.forEach(([row, col]: [number, number]) => {
+          drawCell(this.ctx, this.dragState.previewRow + row, this.dragState.previewCol + col, this.dragState.shape!.color, this.config, 0.5);
+        });
+      }
     }
     if (this.state.status === 'idle') this.drawOverlay('Tap to Start');
     else if (this.state.status === 'gameover') this.drawOverlay(`Game Over!\nScore: ${this.state.score}\nTap to Restart`);

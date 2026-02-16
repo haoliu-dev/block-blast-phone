@@ -56,9 +56,9 @@ export function drawScore(ctx: CanvasRenderingContext2D, state: GameState, confi
 }
 
 export function drawShapes(ctx: CanvasRenderingContext2D, shapes: { cells: [number, number][]; color: number }[], config: CanvasConfig): void {
-  const shapeWidth = config.cellSize * 2;
+  const shapeWidth = config.cellSize * 4;
   const startX = config.width / 2 - (shapes.length * shapeWidth) / 2;
-  const startY = config.height - config.cellSize * 4;
+  const startY = config.height - config.cellSize * 5;
   
   shapes.forEach((shape, index) => {
     const offsetX = startX + index * shapeWidth;
@@ -66,7 +66,7 @@ export function drawShapes(ctx: CanvasRenderingContext2D, shapes: { cells: [numb
     
     shape.cells.forEach(([row, col]) => {
       ctx.fillStyle = COLORS[shape.color - 1];
-      ctx.fillRect(offsetX + col * config.cellSize * 0.5, offsetY + row * config.cellSize * 0.5, config.cellSize * 0.5 - 1, config.cellSize * 0.5 - 1);
+      ctx.fillRect(offsetX + col * config.cellSize, offsetY + row * config.cellSize, config.cellSize - 1, config.cellSize - 1);
     });
   });
 }
