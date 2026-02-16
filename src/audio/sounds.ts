@@ -77,11 +77,23 @@ class SoundManager {
   applyTempoChange(linesCleared: number): void {
     if (!this.isPlaying || !this.audioContext) return;
     
-    const multiplier = 1 + 0.1 * linesCleared;
+    const newMultiplier = 1.1 + 0.2 * linesCleared;
     const duration = 2 + linesCleared * 2;
-    const endTime = this.audioContext.currentTime + duration;
+    const now = this.audioContext.currentTime;
     
-    this.tempoChangeStack.push({ multiplier, endTime });
+    if (this.tempoChangeStack.length > 0) {
+      const maxCurrentMultiplier = Math.max(...this.tempoChangeStack.map(t => t.multiplier));
+      const effectiveMultiplier = Math.max(maxCurrentMultiplier, newMultiplier);
+      
+      this.tempoChangeStack = this.tempoChangeStack.map(t => ({
+        ...t,
+        multiplier: effectiveMultiplier,
+        endTime: now + duration
+      }));
+    } else {
+      this.tempoChangeStack.push({ multiplier: newMultiplier, endTime: now + duration });
+    }
+    
     this.updateEffectiveTempo();
   }
 
@@ -151,7 +163,7 @@ class SoundManager {
     const currentTime = ctx.currentTime;
     const quarterNoteTime = (60 / this.BASE_TEMPO) / this.tempoMultiplier;
 
-    while (this.nextMelodyTime < currentTime + this.LOOKAHEAD && this.currentLoop < 4) {
+    while (this.nextMelodyTime < currentTime + this.LOOKAHEAD) {
       const note = this.melodyData[this.nextNoteIndex];
       const dur = note.d * quarterNoteTime;
       this.scheduleNote(note.n, dur, this.nextMelodyTime, 'square', 0.25);
@@ -160,15 +172,14 @@ class SoundManager {
       if (this.nextNoteIndex >= this.melodyData.length) {
         this.nextNoteIndex = 0;
         this.currentLoop++;
-        if (this.currentLoop >= 4) break;
       }
     }
 
     const melodyTotalTime = this.melodyTotalBeats * quarterNoteTime;
-    const loopStartTime = this.musicStartTime + this.currentLoop * melodyTotalTime;
+    const loopStartTime = this.musicStartTime + (this.currentLoop - 1) * melodyTotalTime;
     const bassLoopDuration = this.bassData.reduce((acc, curr) => acc + curr.d, 0) * quarterNoteTime;
 
-    while (this.nextBassTime < currentTime + this.LOOKAHEAD && this.currentLoop < 4) {
+    while (this.nextBassTime < currentTime + this.LOOKAHEAD) {
       const expectedBassTime = loopStartTime + (this.nextBassTime - loopStartTime) % bassLoopDuration;
       if (this.nextBassTime >= loopStartTime - 0.1) {
         const note = this.bassData[this.nextBassIndex];
@@ -181,15 +192,6 @@ class SoundManager {
         }
       } else {
         this.nextBassTime += quarterNoteTime;
-      }
-    }
-
-    if (this.currentLoop >= 4 && this.nextBassTime < loopStartTime + bassLoopDuration - 0.1) {
-      // Continue bass until it catches up
-    } else if (this.currentLoop >= 4 && this.nextMelodyTime >= loopStartTime + melodyTotalTime) {
-      this.stopBgMusic();
-      if (this.bgMusicEnabled) {
-        this.playRussianFolkTheme();
       }
     }
   }
