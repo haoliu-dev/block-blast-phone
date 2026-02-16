@@ -2,6 +2,8 @@
 
 移动端方块消除游戏 (Block Blast) - 使用 Bun + TypeScript + HTML5 Canvas 开发。
 
+🎮 **[在线试玩](https://haoliu-dev.github.io/block-blast-phone/)**
+
 ## 特性
 
 - 🎮 经典方块消除玩法
