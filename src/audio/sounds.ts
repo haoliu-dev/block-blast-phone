@@ -100,7 +100,7 @@ class SoundManager {
     if (!this.isPlaying || !this.audioContext) return;
     
     const newMultiplier = 1.1 + 0.2 * linesCleared;
-    const duration = 4 + linesCleared * 2;
+    const duration = 5 + linesCleared * 5;
     const now = this.audioContext.currentTime;
     
     if (this.tempoChangeStack.length > 0) {
