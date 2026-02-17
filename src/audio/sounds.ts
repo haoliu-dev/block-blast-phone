@@ -49,6 +49,8 @@ class SoundManager {
 
   setEnabled(enabled: boolean): void { this.enabled = enabled; }
   
+  isBgMusicEnabled(): boolean { return this.bgMusicEnabled; }
+  
   setBgMusicEnabled(enabled: boolean): void {
     this.bgMusicEnabled = enabled;
     

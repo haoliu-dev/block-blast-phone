@@ -50,7 +50,6 @@ export class GameRenderer {
   private screenShake: { intensity: number; decay: number } = { intensity: 0, decay: 0 };
   private scoreAnim: ScoreAnimation | null = null;
   private lastScore: number = 0;
-  private bgMusicEnabled: boolean = false;
   private soundIconSize: number = 40;
 
   constructor(canvas: HTMLCanvasElement) {
@@ -96,8 +95,8 @@ export class GameRenderer {
     // Check if clicked on sound icon
     if (x >= iconX - iconSize/2 && x <= iconX + iconSize/2 && 
         y >= iconY - iconSize/2 && y <= iconY + iconSize/2) {
-      this.bgMusicEnabled = !this.bgMusicEnabled;
-      soundManager.setBgMusicEnabled(this.bgMusicEnabled);
+      const isCurrentlyEnabled = soundManager.isBgMusicEnabled();
+      soundManager.setBgMusicEnabled(!isCurrentlyEnabled);
       this.render();
       return;
     }
@@ -446,13 +445,14 @@ export class GameRenderer {
     const iconX = 20;
     const iconY = 20;
     const iconSize = this.soundIconSize;
+    const isEnabled = soundManager.isBgMusicEnabled();
     
     this.ctx.save();
     this.ctx.font = '24px sans-serif';
     this.ctx.textAlign = 'center';
     this.ctx.textBaseline = 'middle';
-    this.ctx.fillStyle = this.bgMusicEnabled ? '#00FF00' : '#FF0000';
-    this.ctx.fillText(this.bgMusicEnabled ? '🔊' : '🔇', iconX, iconY);
+    this.ctx.fillStyle = isEnabled ? '#00FF00' : '#FF0000';
+    this.ctx.fillText(isEnabled ? '🔊' : '🔇', iconX, iconY);
     this.ctx.restore();
   }
 
