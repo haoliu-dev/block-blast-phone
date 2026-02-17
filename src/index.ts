@@ -9,17 +9,17 @@ function init(): void {
     console.error('Canvas not found');
     return;
   }
-  new GameRenderer(canvas);
-  canvas.addEventListener('touchstart', () => soundManager.init().catch(console.error), { once: true });
-  canvas.addEventListener('click', () => soundManager.init().catch(console.error), { once: true });
+  const renderer = new GameRenderer(canvas);
+  canvas.addEventListener('touchstart', () => soundManager.init().then(() => renderer.render()), { once: true });
+  canvas.addEventListener('click', () => soundManager.init().then(() => renderer.render()), { once: true });
   
   // Keyboard shortcut to toggle background music (M key)
   window.addEventListener('keydown', async (e) => {
     if (e.key === 'm' || e.key === 'M') {
-      if (!soundManager) return;
       await soundManager.init();
-      bgMusicOn = !bgMusicOn;
-      soundManager.setBgMusicEnabled(bgMusicOn);
+      const isEnabled = soundManager.isBgMusicEnabled();
+      soundManager.setBgMusicEnabled(!isEnabled);
+      renderer.render();
     }
   });
 }
